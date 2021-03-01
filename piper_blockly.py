@@ -298,3 +298,7 @@ def stringCompare(a, b):
     except:
         return 0
     return f
+
+# map (scale) a value from one range (a, b) to a new range (c, d)
+def mapValue(value, a, b, c, d):
+    return c + ((float(value - a) / float(b - a)) * (d - c))
