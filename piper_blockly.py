@@ -302,3 +302,11 @@ def stringCompare(a, b):
 # map (scale) a value from one range (a, b) to a new range (c, d)
 def mapValue(value, a, b, c, d):
     return c + ((float(value - a) / float(b - a)) * (d - c))
+
+# helper function for graphing number values
+def piperGraphNumbers(graph_values):
+    print(chr(17), 'G', ','.join(graph_values), chr(17), end='')
+    
+# helper function for graphing a color value (tuple)
+def piperGraphColor(color_value):
+    print(chr(17), 'C', str(${value}), chr(17), end='')
