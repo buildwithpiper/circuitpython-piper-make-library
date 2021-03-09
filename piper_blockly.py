@@ -1,3 +1,4 @@
+
 ################################################################################
 # The MIT License (MIT)
 #
@@ -131,7 +132,7 @@ class piperDistanceSensorPin:
             d = self.pin.distance
         except RuntimeError as e:
             d = None
-            print("Error reading distance sensor")
+            print("Error reading distance sensor", str(e))
         return d
 
 # The temperature sensor is attached to the I2C bus which can be shared
@@ -161,10 +162,14 @@ class piperColorSensor:
             print(chr(17), "GP20|D", chr(16), end="")
             print(chr(17), "GP21|D", chr(16), end="")
             
-            r,g,b,clear = self.color_sensor.color_raw
-            if clear == 0:
-                return (0,0,0) +
-            return (min(int((r * self.mult/clear) ** 2.3 * 255),255), min(int((g * self.mult / clear) ** 2.5 * 255), 255), min(int((b * self.mult / clear) ** 2.6 * 255), 255))
+        r, g, b, clear = self.color_sensor.color_raw
+        if clear == 0:
+            return (0, 0, 0)
+        
+        r = min(int((r * self.mult / clear) ** 2.3 * 255), 255)
+        g = min(int((g * self.mult / clear) ** 2.5 * 255), 255)
+        b = min(int((b * self.mult / clear) ** 2.6 * 255), 255)
+        return (r, g, b)
 
     def sensorGain(self, val):
         self.mult = val
