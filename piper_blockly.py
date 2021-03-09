@@ -153,7 +153,7 @@ class piperColorSensor:
     def __init__(self, i2c_bus):
         self.color_sensor = adafruit_tcs34725.TCS34725(i2c_bus)
         self.color_sensor.gain = 60
-        self.mult = pow(60, 0.18)
+        self.mult = pow((128/60), 0.6)
 
     def readColorSensor(self):
         global digital_view
@@ -165,18 +165,16 @@ class piperColorSensor:
         if clear == 0:
             return (0, 0, 0)
         
-        r = min(int(pow((r * self.mult / clear), 2.3) * 255), 255)
-        g = min(int(pow((g * self.mult / clear), 2.5) * 255), 255)
-        b = min(int(pow((b * self.mult / clear), 2.6) * 255), 255)
-
-        r = min(int(pow((r * self.mult / clear), 2.3) * 255), 255)
-        g = min(int(pow((g * self.mult / clear), 2.5) * 255), 255)
-        b = min(int(pow((b * self.mult / clear), 2.6) * 255), 255)
+        s = (r * 0.92 + g * 0.98 + b * 1.1) / 3
+        c1 = pow(clear, 0.96)
+        r1 = int(min(r * c1 * self.mult / s, 255))
+        g1 = int(min(g * c1 * self.mult / s, 255))
+        b1 = int(min(b * c1 * self.mult / s, 255))
         
-        return (r, g, b)
+        return (r1, g1, b1)
 
     def sensorGain(self, val):
-        self.mult = pow(val, 0.18)
+        self.mult = pow((128/val), 0.6)
         self.color_sensor.gain = val
 
 # The DotStar is connected to fixed PCB pins
