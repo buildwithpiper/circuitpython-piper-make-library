@@ -309,4 +309,4 @@ def piperGraphNumbers(graph_values):
     
 # helper function for graphing a color value (tuple)
 def piperGraphColor(color_value):
-    print(chr(17), 'C', str(${value}), chr(17), end='')
+    print(chr(17), 'C', str(color_value), chr(17), end='')
