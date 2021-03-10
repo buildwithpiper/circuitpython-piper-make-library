@@ -1,3 +1,4 @@
+
 ################################################################################
 # The MIT License (MIT)
 #
@@ -292,7 +293,7 @@ def emojiCharacter(c):
 # compares two colors (3-tuples) and outputs a value from 0 (opposite) to 100 (the same).
 def colorCompare(a, b):
     try:
-        c = (abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])) * 20 / 153
+        c = 100 - int((abs(a[0] - b[0]) + abs(a[1] - b[1]) + abs(a[2] - b[2])) * 20 / 153)
     except:
         return 0
     return c
@@ -300,7 +301,7 @@ def colorCompare(a, b):
 # compares two numbers (int or float) and outputs a value from 0 (very different) to 100 (the same).
 def numberCompare(a, b):
     try:
-        c = (1 - abs(a-b)/(abs(a) + abs(b))) * 100
+        c = int((1 - abs(a-b)/(abs(a) + abs(b))) * 100)
     except:
         return 0
     return c
@@ -311,7 +312,7 @@ def stringCompare(a, b):
         c = set(list(a))
         d = set(list(b))
         e = c.intersection(d)
-        f = (float(len(e)) / (len(c) + len(d) - len(e))) * 100
+        f = int((float(len(e)) / (len(c) + len(d) - len(e))) * 100)
     except:
         return 0
     return f
