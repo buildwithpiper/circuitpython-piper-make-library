@@ -1,4 +1,3 @@
-
 ################################################################################
 # The MIT License (MIT)
 #
@@ -166,11 +165,11 @@ class piperColorSensor:
         if clear == 0:
             return (0, 0, 0)
         
-        s = (r * 0.92 + g * 0.98 + b * 1.1) / 3
-        c1 = pow(clear, 0.96)
-        r1 = int(min(r * c1 * self.mult / s, 255))
-        g1 = int(min(g * c1 * self.mult / s, 255))
-        b1 = int(min(b * c1 * self.mult / s, 255))
+        s = (r ** 1.95 + g ** 2.025 + b * b) / 3
+        c1 = clear ** 0.9
+        r1 = int(min(r * r * c1 * self.mult / s, 255))
+        g1 = int(min(g * g * c1 * self.mult / s, 255))
+        b1 = int(min(b * b * c1 * self.mult / s, 255))
         
         return (r1, g1, b1)
 
