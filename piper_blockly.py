@@ -24,6 +24,7 @@
 ################################################################################
 import board
 from digitalio import DigitalInOut, Direction, Pull
+from analogio import AnalogIn
 from adafruit_debouncer import Debouncer
 import math
 import grove_ultrasonic_ranger
@@ -45,7 +46,7 @@ class piperPin:
             self.debounceRose = Debouncer(self.pin)
             self.debounceFell = Debouncer(self.pin)
         elif type == 'Analog':
-            self.pin = analogio.AnalogIn(pin)
+            self.pin = AnalogIn(pin)
         self.name = name
 
     # Report the pin's state for use by the digital view
