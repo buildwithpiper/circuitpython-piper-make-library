@@ -31,6 +31,8 @@ import grove_ultrasonic_ranger
 import adafruit_mcp9808
 import adafruit_tcs34725
 #import adafruit_dotstar
+import pwmio
+from adafruit_motor import servo
 
 # TODO - Global lives where? Should be inserted by code generator
 digital_view = True
@@ -116,7 +118,29 @@ class piperPin:
         self.reportPin(str(pinValue))
         return pinValue * 3.3
 
-# This is specific to pins which are attached to an ultrasonic distance sensor
+# This is specific to pins which are attached to a servo
+# and we won't allow GPIO operations for now
+#
+class piperServoPin:
+    def __init__(self, pin, name):
+        # create a PWMOut object on the control pin.
+        self.pwm = pwmio.PWMOut(pin, duty_cycle=0, frequency=50)
+        self.pin = servo.Servo(self.pwm, min_pulse=580, max_pulse=2350)
+        self.name = name
+
+    def setServoAngle(self, a):
+        global digital_view
+        if digital_view:
+            print(chr(17), self.name + "|D", chr(16), end="")
+        try:
+            if a == None:
+                self.pin.fraction = None
+            else:
+                self.pin.angle = a
+        except RuntimeError as e:
+            print("Error setting servo angle", str(e))
+
+    # This is specific to pins which are attached to an ultrasonic distance sensor
 # and we won't allow GPIO operations for now
 #
 class piperDistanceSensorPin:
