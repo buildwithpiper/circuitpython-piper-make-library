@@ -140,6 +140,15 @@ class piperServoPin:
         except RuntimeError as e:
             print("Error setting servo angle", str(e))
 
+    def setServoFraction(self, f):
+        global digital_view
+        if digital_view:
+            print(chr(17), self.name + "|D", chr(16), end="")
+        try:
+            self.pin.fraction = f
+        except RuntimeError as e:
+            print("Error setting servo position", str(e))
+
     # This is specific to pins which are attached to an ultrasonic distance sensor
 # and we won't allow GPIO operations for now
 #
