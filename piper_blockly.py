@@ -22,6 +22,7 @@
 # THE SOFTWARE.
 #
 ################################################################################
+
 import board
 from digitalio import DigitalInOut, Direction, Pull
 from analogio import AnalogIn
@@ -33,6 +34,8 @@ import adafruit_tcs34725
 #import adafruit_dotstar
 import pwmio
 from adafruit_motor import servo
+from gamepadshift import GamePadShift
+from micropython import const
 
 # TODO - Global lives where? Should be inserted by code generator
 digital_view = True
@@ -149,7 +152,7 @@ class piperServoPin:
         except RuntimeError as e:
             print("Error setting servo position", str(e))
 
-    # This is specific to pins which are attached to an ultrasonic distance sensor
+# This is specific to pins which are attached to an ultrasonic distance sensor
 # and we won't allow GPIO operations for now
 #
 class piperDistanceSensorPin:
@@ -211,6 +214,74 @@ class piperColorSensor:
         self.mult = pow((128/val), 0.6)
         self.color_sensor.gain = val
 
+
+# constants associated with the Piper Make Controller
+BUTTON_LEFT = const(128)
+BUTTON_UP = const(64)
+BUTTON_RIGHT = const(32)
+BUTTON_DOWN = const(16)
+
+BUTTON_A = const(8)
+BUTTON_B = const(4)
+BUTTON_C = const(2)
+BUTTON_X = const(1)
+BUTTON_Y = const(32768)
+BUTTON_Z = const(16384)
+
+BUTTON_SELECT = const(8192)
+BUTTON_MODE = const(4096)
+BUTTON_OPTION = const(2048)
+BUTTON_START = const(1024)
+
+BUTTON_1 = const(128)
+BUTTON_2 = const(64)
+BUTTON_3 = const(32)
+BUTTON_4 = const(16)
+
+BUTTON_5 = const(8)
+BUTTON_6 = const(4)
+BUTTON_7 = const(2)
+BUTTON_8 = const(1)
+BUTTON_9 = const(32768)
+BUTTON_10 = const(16384)
+
+BUTTON_11 = const(8192)
+BUTTON_12 = const(4096)
+BUTTON_13 = const(2048)
+BUTTON_14 = const(1024)
+
+# This is specific to pins which are attached to the Piper Make Controller
+# and we won't allow GPIO operations for now
+#
+class piperControllerPins:
+    def __init__(self, clock_pin, clock_name, data_pin, data_name, latch_pin, latch_name):
+        self.clock_pin = DigitalInOut(clock_pin)
+        self.data_pin = DigitalInOut(data_pin)
+        self.latch_pin = DigitalInOut(latch_pin)
+        
+        self.clock_name = clock_name
+        self.data_name = data_name
+        self.latch_name = latch_name
+        
+        self.gamepad = GamePadShift(self.clock_pin, self.data_pin, self.latch_pin)
+
+    def readButtons(self):
+        global digital_view
+        if digital_view:
+            print(chr(17), self.clock_name + "|D", chr(16), end="")
+            print(chr(17), self.data_name + "|D", chr(16), end="")
+            print(chr(17), self.latch_name + "|D", chr(16), end="")
+
+        try:
+            self.buttons = a = self.gamepad.get_pressed()
+        except RuntimeError as e:
+            print("Error reading controller buttons", str(e))
+        return self.buttons
+
+    def wasPressed(self, b):
+        return self.buttons & b
+
+
 # The DotStar is connected to fixed PCB pins
 #
 #class piperDotStar:
@@ -228,8 +299,6 @@ class piperColorSensor:
 # This function allows a user to manage joystick handling themselves.
 # See http://www.mimirgames.com/articles/games/joystick-input-and-using-deadbands/
 # for the motivation and theory
-#
-# TODO - add digital view support here
 #
 class piperJoystickAxis:
     def __init__(self, pin, name, outputScale=20.0, deadbandCutoff=0.1, weight=0.2):
