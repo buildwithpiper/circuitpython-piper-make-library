@@ -23,7 +23,6 @@
 #
 ################################################################################
 
-import board
 from digitalio import DigitalInOut, Direction, Pull
 from analogio import AnalogIn
 from adafruit_debouncer import Debouncer
@@ -37,8 +36,12 @@ from adafruit_motor import servo
 from gamepadshift import GamePadShift
 from micropython import const
 
-# TODO - Global lives where? Should be inserted by code generator
+
 digital_view = True
+
+def set_digital_view(state):
+    global digital_view
+    digital_view = state
 
 ################################################################################
 # This class is for digital GPIO pins
@@ -58,7 +61,7 @@ class piperPin:
     #
     def reportPin(self, pinStr):
         global digital_view
-        if digital_view:
+        if (digital_view == True):
             if not pinStr:
                 self.pin.direction = Direction.INPUT
                 self.pin.pull = Pull.UP
@@ -133,7 +136,7 @@ class piperServoPin:
 
     def setServoAngle(self, a):
         global digital_view
-        if digital_view:
+        if (digital_view == True):
             print(chr(17), self.name + "|D", chr(16), end="")
         try:
             if a == None:
@@ -145,7 +148,7 @@ class piperServoPin:
 
     def setServoFraction(self, f):
         global digital_view
-        if digital_view:
+        if (digital_view == True):
             print(chr(17), self.name + "|D", chr(16), end="")
         try:
             self.pin.fraction = f
@@ -162,7 +165,7 @@ class piperDistanceSensorPin:
 
     def readDistanceSensor(self):
         global digital_view
-        if digital_view:
+        if (digital_view == True):
             print(chr(17), self.name + "|D", chr(16), end="")
         try:
             d = self.pin.distance
@@ -179,7 +182,7 @@ class piperTemperatureSensor:
 
     def readTemperatureSensor(self):
         global digital_view
-        if digital_view:
+        if (digital_view == True):
             print(chr(17), "GP20|D", chr(16), end="")
             print(chr(17), "GP21|D", chr(16), end="")
         return self.temperature_sensor.temperature
@@ -194,7 +197,7 @@ class piperColorSensor:
 
     def readColorSensor(self):
         global digital_view
-        if digital_view:
+        if (digital_view == True):
             print(chr(17), "GP20|D", chr(16), end="")
             print(chr(17), "GP21|D", chr(16), end="")
             
@@ -216,23 +219,6 @@ class piperColorSensor:
 
 
 # constants associated with the Piper Make Controller
-BUTTON_LEFT = const(128)
-BUTTON_UP = const(64)
-BUTTON_RIGHT = const(32)
-BUTTON_DOWN = const(16)
-
-BUTTON_A = const(8)
-BUTTON_B = const(4)
-BUTTON_C = const(2)
-BUTTON_X = const(1)
-BUTTON_Y = const(32768)
-BUTTON_Z = const(16384)
-
-BUTTON_SELECT = const(8192)
-BUTTON_MODE = const(4096)
-BUTTON_OPTION = const(2048)
-BUTTON_START = const(1024)
-
 BUTTON_1 = const(128)
 BUTTON_2 = const(64)
 BUTTON_3 = const(32)
@@ -267,19 +253,22 @@ class piperControllerPins:
 
     def readButtons(self):
         global digital_view
-        if digital_view:
+        if (digital_view == True):
             print(chr(17), self.clock_name + "|D", chr(16), end="")
             print(chr(17), self.data_name + "|D", chr(16), end="")
             print(chr(17), self.latch_name + "|D", chr(16), end="")
 
         try:
-            self.buttons = a = self.gamepad.get_pressed()
+            self.buttons = self.gamepad.get_pressed()
         except RuntimeError as e:
             print("Error reading controller buttons", str(e))
         return self.buttons
 
     def wasPressed(self, b):
-        return self.buttons & b
+        if (self.buttons & b):
+            return True
+        else:
+            return False
 
 
 # The DotStar is connected to fixed PCB pins
@@ -331,7 +320,7 @@ class piperJoystickAxis:
     #
     def readJoystickAxis(self):
         pinValue = self.pin.value
-        if digital_view:
+        if (digital_view == True):
             print(chr(17), self.name, "|", str(pinValue), chr(16), end="")
         return int(self._cubicScaledDeadband((pinValue / 2 ** 15) - 1) * self.outputScale)
 
