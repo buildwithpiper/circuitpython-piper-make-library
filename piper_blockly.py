@@ -339,15 +339,7 @@ def consoleClear():
     print(chr(16), end="")
 
 def consolePosition(x, y):
-    x = int(x); y = int(y)
-    if (x != 10 and y != 10):
-        print("".join([chr(x) for x in [2, min(255, max(0, x)), min(255, max(0, y))]]), end="")
-    elif (x == 10 and y == 10):
-        print("".join([chr(x) for x in [2, 9, 9, 4, 6]]), end="")
-    elif (x == 10):
-        print("".join([chr(x) for x in [2, 9, min(255, max(0, y)), 4]]), end="")
-    else:
-        print("".join([chr(x) for x in [2, min(255, max(0, x)), 9, 6]]), end="")
+    print(chr(17), 'P', str(int(x)) + ',' + str(int(y)), chr(17), end='')
 
 # instructs the connected computer to play a sound by sending control characters and the name
 # (or instructions related to) the specified sound
