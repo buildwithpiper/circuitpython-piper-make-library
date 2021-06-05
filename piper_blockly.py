@@ -236,6 +236,8 @@ BUTTON_12 = const(4096)
 BUTTON_13 = const(2048)
 BUTTON_14 = const(1024)
 
+ANY_BUTTON = const(64767)  # All of the bits used by the controller
+
 # This is specific to pins which are attached to the Piper Make Controller
 # and we won't allow GPIO operations for now
 #
