@@ -35,6 +35,7 @@ import pwmio
 from adafruit_motor import servo
 from gamepadshift import GamePadShift
 from micropython import const
+from touchio import TouchIn
 
 
 digital_view = True
@@ -154,6 +155,25 @@ class piperServoPin:
             self.pin.fraction = f
         except RuntimeError as e:
             print("Error setting servo position", str(e))
+
+# This is specific to pins which are used for capacitive sensing sensor
+# and we won't allow GPIO operations for now
+#
+class piperCapSensePin:
+    def __init__(self, pin, name):
+        self.pin = TouchIn(pin)
+        self.name = name
+
+    def readCapSenseValue(self):
+        global digital_view
+        if (digital_view == True):
+            print(chr(17), self.name + "|D", chr(16), end="")
+        try:
+            d = self.pin.raw_value
+        except RuntimeError as e:
+            d = None
+            print("Error reading capactive sense value", str(e))
+        return d
 
 # This is specific to pins which are attached to an ultrasonic distance sensor
 # and we won't allow GPIO operations for now
@@ -341,7 +361,9 @@ def consoleClear():
     print(chr(16), end="")
 
 def consolePosition(x, y):
-    print(chr(17), 'P', str(int(x)) + ',' + str(int(y)), chr(17), end='')
+    x = (min(max(int(x), 0), 255))
+    y = (min(max(int(y), 0), 255))
+    print(chr(17), 'P', str(x) + ',' + str(y), chr(17), end='')
 
 # instructs the connected computer to play a sound by sending control characters and the name
 # (or instructions related to) the specified sound
