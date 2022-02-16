@@ -30,15 +30,21 @@ import math
 import grove_ultrasonic_ranger
 import adafruit_mcp9808
 import adafruit_tcs34725
+import adafruit_mpu6050
 #import adafruit_dotstar
 import pwmio
 from adafruit_motor import servo
 from gamepadshift import GamePadShift
 from micropython import const
 from touchio import TouchIn
-
+import neopixel
+from rainbowio import colorwheel
+import time
 
 digital_view = True
+
+piper_pin_states = []
+piper_pin_names = []
 
 def set_digital_view(state):
     global digital_view
@@ -66,15 +72,16 @@ class piperPin:
             if not pinStr:
                 self.pin.direction = Direction.INPUT
                 self.pin.pull = Pull.UP
-                pinStr = str(float(self.pin.value))
-            print(chr(17), self.name, "|", pinStr, chr(16), end="")
+                pinStr = float(self.pin.value)
+            send_piper_pin_state(self.name, pinStr)
+            #print(chr(17), self.name, "|", pinStr, chr(16), end="")
 
     # Sets the pin to be an output at the specified logic level
     #
     def setPin(self, pinState):
         self.pin.direction = Direction.OUTPUT
         self.pin.value = pinState
-        self.reportPin(str(pinState))
+        self.reportPin(pinState)
 
     # Reads the pin by setting it to an input and setting it's pull-up/down and then returning its value
     # (Note that this means you can't use it to detect the state of output pins)
@@ -83,7 +90,7 @@ class piperPin:
         self.pin.direction = Direction.INPUT
         self.pin.pull = pinPull
         pinValue = self.pin.value
-        self.reportPin(str(float(pinValue)))
+        self.reportPin(float(pinValue))
         return pinValue
 
     # Same as checkPin except debounced
@@ -93,7 +100,7 @@ class piperPin:
         self.pin.pull = pinPull
         self.debounced.update()
         pinValue = self.debounced.value
-        self.reportPin(str(float(pinValue)))
+        self.reportPin(float(pinValue))
         return pinValue
 
     # Look for rising edge. Typically happens when a button (with pullup)
@@ -122,7 +129,7 @@ class piperPin:
     #
     def readVoltage(self):
         pinValue = self.pin.value / 65536
-        self.reportPin(str(pinValue))
+        self.reportPin(pinValue)
         return pinValue * 3.3
 
 # This is specific to pins which are attached to a servo
@@ -136,9 +143,10 @@ class piperServoPin:
         self.name = name
 
     def setServoAngle(self, a):
-        global digital_view
-        if (digital_view == True):
-            print(chr(17), self.name + "|D", chr(16), end="")
+        #global digital_view
+        #if (digital_view == True):
+        #    print(chr(17), self.name + "|D", chr(16), end="")
+        send_piper_pin_state(self.name, "P")
         try:
             if a == None:
                 self.pin.fraction = None
@@ -148,9 +156,10 @@ class piperServoPin:
             print("Error setting servo angle", str(e))
 
     def setServoFraction(self, f):
-        global digital_view
-        if (digital_view == True):
-            print(chr(17), self.name + "|D", chr(16), end="")
+        #global digital_view
+        #if (digital_view == True):
+        #    print(chr(17), self.name + "|D", chr(16), end="")
+        send_piper_pin_state(self.name, "P")
         try:
             self.pin.fraction = f
         except RuntimeError as e:
@@ -165,9 +174,10 @@ class piperCapSensePin:
         self.name = name
 
     def readCapSenseValue(self):
-        global digital_view
-        if (digital_view == True):
-            print(chr(17), self.name + "|D", chr(16), end="")
+        #global digital_view
+        #if (digital_view == True):
+        #    print(chr(17), self.name + "|D", chr(16), end="")
+        send_piper_pin_state(self.name, "P")
         try:
             d = self.pin.raw_value
         except RuntimeError as e:
@@ -184,9 +194,10 @@ class piperDistanceSensorPin:
         self.name = name
 
     def readDistanceSensor(self):
-        global digital_view
-        if (digital_view == True):
-            print(chr(17), self.name + "|D", chr(16), end="")
+        #global digital_view
+        #if (digital_view == True):
+        #    print(chr(17), self.name + "|D", chr(16), end="")
+        send_piper_pin_state(self.name, "P")
         try:
             d = self.pin.distance
         except RuntimeError as e:
@@ -201,10 +212,12 @@ class piperTemperatureSensor:
         self.temperature_sensor = adafruit_mcp9808.MCP9808(i2c_bus)
 
     def readTemperatureSensor(self):
-        global digital_view
-        if (digital_view == True):
-            print(chr(17), "GP20|D", chr(16), end="")
-            print(chr(17), "GP21|D", chr(16), end="")
+        #global digital_view
+        #if (digital_view == True):
+        #    print(chr(17), "GP20|D", chr(16), end="")
+        #    print(chr(17), "GP21|D", chr(16), end="")
+        send_piper_pin_state("GP20", "P")
+        send_piper_pin_state("GP21", "P")
         return self.temperature_sensor.temperature
 
 # The color sensor is attached to the I2C bus which can be shared
@@ -216,11 +229,13 @@ class piperColorSensor:
         self.mult = pow((128/60), 0.6)
 
     def readColorSensor(self):
-        global digital_view
-        if (digital_view == True):
-            print(chr(17), "GP20|D", chr(16), end="")
-            print(chr(17), "GP21|D", chr(16), end="")
-            
+        #global digital_view
+        #if (digital_view == True):
+        #    print(chr(17), "GP20|D", chr(16), end="")
+        #    print(chr(17), "GP21|D", chr(16), end="")
+        send_piper_pin_state("GP20", "P")
+        send_piper_pin_state("GP21", "P")
+
         r, g, b, clear = self.color_sensor.color_raw
         if clear == 0:
             return (0, 0, 0)
@@ -237,6 +252,62 @@ class piperColorSensor:
         self.mult = pow((128/val), 0.6)
         self.color_sensor.gain = val
 
+    def read(self):
+        return self.readColorSensor()
+        
+    def sensorGain(self, val):
+        self.mult = pow((128/val), 0.6)
+        self.color_sensor.gain = val
+
+
+# The MPU6050 IMU is attached to the I2C bus which can be shared
+#
+class piperMotionSensor:
+    def __init__(self, i2c_bus, address=0x69):
+        self.motion_sensor = adafruit_mpu6050.MPU6050(i2c_bus, address=address)
+
+    def readMotionSensor(self):
+        #global digital_view
+        #if (digital_view == True):
+        #    print(chr(17), "GP20|D", chr(16), end="")
+        #    print(chr(17), "GP21|D", chr(16), end="")
+        send_piper_pin_state("GP20", "P")
+        send_piper_pin_state("GP21", "P")
+
+        self.acc_x, self.acc_y, self.acc_z = self.motion_sensor.acceleration
+        self.gyro_x, self.gyro_y, self.gyro_z = self.motion_sensor.gyro
+        self.temp = self.motion_sensor.temperature
+        self.roll = math.atan2(self.acc_y, self.acc_z) * 180 / math.pi
+        self.pitch = math.atan2(self.acc_z, self.acc_x) * 180 / math.pi
+        self.yaw = math.atan2(self.acc_x, self.acc_y) * 180 / math.pi
+
+    def read(self):
+        self.readMotionSensor()
+
+# The Heart sensor is attached to the I2C bus which can be shared
+#
+class piperHeartSensor:
+    def __init__(self, i2c_bus):
+        self.heart_sensor = piper_heart_sensor(i2c_bus, 4, 175)  # Use options that are generally effective
+        self.raw_value = 0
+        self.heart_rate = -1
+
+    def readHeartSensor(self):
+        #global digital_view
+        #if (digital_view == True):
+        #    print(chr(17), "GP20|D", chr(16), end="")
+        #    print(chr(17), "GP21|D", chr(16), end="")
+        send_piper_pin_state("GP20", "P")
+        send_piper_pin_state("GP21", "P")
+
+        self.raw_value = self.heart_sensor.read_sensor()
+        if (self.heart_sensor.heart_rate == None):
+            self.heart_rate = -1
+        else:
+            self.heart_rate = self.heart_sensor.heart_rate
+
+    def read(self):
+        self.readHeartSensor()
 
 # constants associated with the Piper Make Controller
 BUTTON_1 = const(128)
@@ -271,15 +342,17 @@ class piperControllerPins:
         self.data_name = data_name
         self.latch_name = latch_name
         
-        self.gamepad = GamePadShift(self.clock_pin, self.data_pin, self.latch_pin)
+        self.gamepad = GamePadShift(self.clock_pin, self.data_pin, self.latch_pin, 16)
 
     def readButtons(self):
-        global digital_view
-        if (digital_view == True):
-            print(chr(17), self.clock_name + "|D", chr(16), end="")
-            print(chr(17), self.data_name + "|D", chr(16), end="")
-            print(chr(17), self.latch_name + "|D", chr(16), end="")
-
+        #global digital_view
+        #if (digital_view == True):
+        #    print(chr(17), self.clock_name + "|D", chr(16), end="")
+        #    print(chr(17), self.data_name + "|D", chr(16), end="")
+        #    print(chr(17), self.latch_name + "|D", chr(16), end="")
+        send_piper_pin_state(self.clock_name, "P")
+        send_piper_pin_state(self.data_name, "P")
+        send_piper_pin_state(self.latch_name, "P")
         try:
             self.buttons = self.gamepad.get_pressed()
         except RuntimeError as e:
@@ -342,13 +415,16 @@ class piperJoystickAxis:
     #
     def readJoystickAxis(self):
         pinValue = self.pin.value
-        if (digital_view == True):
-            print(chr(17), self.name, "|", str(pinValue), chr(16), end="")
+        #if (digital_view == True):
+        #    print(chr(17), self.name, "|", str(pinValue), chr(16), end="")
+        send_piper_pin_state(self.name, pinValue)
         return int(self._cubicScaledDeadband((pinValue / 2 ** 15) - 1) * self.outputScale)
 
 ################################################################################
 # Blocky support functions
-#
+################################################################################
+
+# used to ensure that a value is a number
 def isNumber(n):
     if not (type(n) is int or type(n) is float):
         try:
@@ -357,13 +433,34 @@ def isNumber(n):
             return 0
     return n
 
+# used to clear the console
 def consoleClear():
     print(chr(16), end="")
 
+# used to position the cursor in the console
 def consolePosition(x, y):
     x = (min(max(int(x), 0), 255))
     y = (min(max(int(y), 0), 255))
     print(chr(17), 'P', str(x) + ',' + str(y), chr(17), end='')
+
+# used internally to send the state of the pins for the digital view - only sends when the state has changed.
+def send_piper_pin_state(_pin_name, _pin_state):
+    global piper_pin_states, piper_pin_names
+    _current_pin_index = 0
+    if (digital_view == True):
+        try:
+            _current_pin_index = piper_pin_names.index(_pin_name)
+        except:
+            piper_pin_names.append(_pin_name)
+            piper_pin_states.append(-1)
+            _current_pin_index = len(piper_pin_names) - 1
+        if (_pin_state == 'P'):
+            if (time.monotonic() > piper_pin_states[_current_pin_index]):
+                print(chr(17), _pin_name + "|D", chr(16), end="")
+                piper_pin_states[_current_pin_index] = time.monotonic() + 0.6
+        elif (piper_pin_states[_current_pin_index] != _pin_state):
+            print(chr(17), _pin_name, "|", str(_pin_state), chr(16), end="")
+            piper_pin_states[_current_pin_index] = _pin_state
 
 # instructs the connected computer to play a sound by sending control characters and the name
 # (or instructions related to) the specified sound
@@ -435,3 +532,16 @@ def piperGraphNumbers(graph_values):
 # helper function for graphing a color value (tuple)
 def piperGraphColor(color_value):
     print(chr(17), 'C', str(color_value), chr(17), end='')
+
+# used to generate an RGB color value form a single integer 0-255
+def piperColorWheel(hue_value, bright_value=100):
+    if (bright_value < 3):
+        return 0
+    if (bright_value >= 100):
+        return colorwheel(int(hue_value) & 255)
+    bright_value /= 100.0
+    hue_value = colorwheel(int(hue_value) & 255)
+    bv_a = int(((hue_value) & 255) * bright_value) & 255
+    bv_b = int(((hue_value >> 8) & 255) * bright_value) & 255
+    bv_c = int(((hue_value >> 16) & 255) * bright_value) & 255
+    return (bv_a, bv_b, bv_c)
