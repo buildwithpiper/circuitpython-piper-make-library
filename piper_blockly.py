@@ -309,6 +309,22 @@ class piperHeartSensor:
     def read(self):
         self.readHeartSensor()
 
+# NeoPixels can be attached to any GPIO pin
+#
+class piperNeoPixels:
+    def __init__(self, pin, name, pixel_count):
+        self.pixels = neopixel.NeoPixel(pin, pixel_count, brightness=0.6, auto_write=False)
+        self.pin = pin
+        self.name = name
+
+    def fill(self, color):
+        self.pixels.fill(color)
+
+    def show(self):
+        send_piper_pin_state(self.name, "P")
+        self.pixels.show()
+        
+
 # constants associated with the Piper Make Controller
 BUTTON_1 = const(128)
 BUTTON_2 = const(64)
