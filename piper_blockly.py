@@ -24,7 +24,7 @@
 ################################################################################
 
 from digitalio import DigitalInOut, Direction, Pull
-from analogio import AnalogIn
+# from analogio import AnalogIn    # PI SBC - REMOVED
 from adafruit_debouncer import Debouncer
 import math
 import grove_ultrasonic_ranger
@@ -34,9 +34,9 @@ import adafruit_mpu6050
 #import adafruit_dotstar
 import pwmio
 from adafruit_motor import servo
-from gamepadshift import GamePadShift
+# from gamepadshift import GamePadShift    # PI SBC - TEMPORARY REMOVE - REPLACE WITH keypad
 from micropython import const
-from touchio import TouchIn
+# from touchio import TouchIn    # PI SBC - REMOVED
 import neopixel
 from rainbowio import colorwheel
 import time
@@ -60,8 +60,8 @@ class piperPin:
             self.debounced = Debouncer(self.pin)
             self.debounceRose = Debouncer(self.pin)
             self.debounceFell = Debouncer(self.pin)
-        elif type == 'Analog':
-            self.pin = AnalogIn(pin)
+        #elif type == 'Analog':    # PI SBC - REMOVED
+            #self.pin = AnalogIn(pin)    # PI SBC - REMOVED
         self.name = name
 
     # Report the pin's state for use by the digital view
@@ -128,9 +128,12 @@ class piperPin:
     # Reads an analog voltage from the specified pin
     #
     def readVoltage(self):
-        pinValue = self.pin.value / 65536
-        self.reportPin(pinValue)
-        return pinValue * 3.3
+        # pinValue = self.pin.value / 65536    # PI SBC - REMOVED
+        # self.reportPin(pinValue)    # PI SBC - REMOVED
+        # return pinValue * 3.3
+        pinValue = self.pin.value
+        self.reportPin(float(pinValue))
+        return pinValue * 3.3        
 
 # This is specific to pins which are attached to a servo
 # and we won't allow GPIO operations for now
@@ -168,6 +171,7 @@ class piperServoPin:
 # This is specific to pins which are used for capacitive sensing sensor
 # and we won't allow GPIO operations for now
 #
+"""   # PI SBC - REMOVED
 class piperCapSensePin:
     def __init__(self, pin, name):
         self.pin = TouchIn(pin)
@@ -184,6 +188,7 @@ class piperCapSensePin:
             d = None
             print("Error reading capactive sense value", str(e))
         return d
+"""
 
 # This is specific to pins which are attached to an ultrasonic distance sensor
 # and we won't allow GPIO operations for now
@@ -323,8 +328,9 @@ class piperNeoPixels:
     def show(self):
         send_piper_pin_state(self.name, "P")
         self.pixels.show()
-        
 
+
+"""   # PI SBC - REMOVED
 # constants associated with the Piper Make Controller
 BUTTON_1 = const(128)
 BUTTON_2 = const(64)
@@ -380,6 +386,7 @@ class piperControllerPins:
             return True
         else:
             return False
+"""
 
 
 # The DotStar is connected to fixed PCB pins
