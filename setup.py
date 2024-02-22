@@ -26,7 +26,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/x-rst",
     # The project's main homepage.
-    url="https://github.com/buildwithpiper/PiperBlocklyLibrary.git",
+    url="https://https://github.com/buildwithpiper/circuitpython-piper-make-library.git",
     # Author details
     author="",
     author_email="",
