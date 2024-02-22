@@ -23,27 +23,32 @@
 #
 ################################################################################
 
-from digitalio import DigitalInOut, Direction, Pull
-from analogio import AnalogIn
+import gpiozero
 import math
-import piper_range_finder
-import piper_heart_sensor
-import piper_motor_module
+from threading import Event, Lock
 import adafruit_mcp9808
 import adafruit_tcs34725
 import adafruit_mpu6050
-import pwmio
-from adafruit_motor import servo
-from micropython import const
-from touchio import TouchIn
+import piper_heart_sensor
+#from touchio import TouchIn
 import neopixel
 from rainbowio import colorwheel
 import time
+
+try:
+    from gpiozero.pins.pigpio import PiGPIOFactory
+except ImportError:
+    PiGPIOFactory = None
 
 digital_view = True
 
 piper_pin_states = []
 piper_pin_names = []
+
+Pull = {
+    'UP': 'up',
+    'DOWN': 'down',
+}
 
 def set_digital_view(state):
     global digital_view
@@ -51,79 +56,65 @@ def set_digital_view(state):
 
 ################################################################################
 # This class is for digital GPIO pins
+#
 class piperPin:
-    def __init__(self, pin, name, type='Digital'):
-        if type == 'Digital':
-            self.pin = DigitalInOut(pin)
-        elif type == 'Analog':
-            self.pin = AnalogIn(pin)
-        elif type == 'Voltage':
-            self.pin = pwmio.PWMOut(pin, frequency=5000, duty_cycle=0)
+    def __init__(self, pin, name):
+        self.pin = gpiozero.DigitalInputDevice(pin)
         self.name = name
 
     # Report the pin's state for use by the digital view
+    #
     def reportPin(self, pinStr):
         global digital_view
         if (digital_view == True):
             if not pinStr:
-                self.pin.direction = Direction.INPUT
-                self.pin.pull = Pull.UP
                 pinStr = float(self.pin.value)
             send_dv_state(self.name, pinStr)
 
     # Sets the pin to be an output at the specified logic level
+    #
     def setPin(self, pinState):
-        if (self.pin.type == 'Voltage'):
-            # Set the pin state by setting a PWM duty cycle.
-            pinValue = max(min(float(pinState), 3.3), 0) / 3.3
-            self.pin.duty_cycle = int(65535 * pinValue)
-            self.reportPin(pinValue)
-        else:
-            self.pin.direction = Direction.OUTPUT
-            self.pin.value = pinState
-            self.reportPin(pinState)
+        self.pin.output_with_state(pinState)
+        self.reportPin(pinState)
 
     # Reads the pin by setting it to an input and setting it's pull-up/down and then returning its value
     # (Note that this means you can't use it to detect the state of output pins)
-    def checkPin(self, pinPull):
-        self.pin.direction = Direction.INPUT
-        self.pin.pull = pinPull
+    #
+    def checkPin(self, pinPull='floating'):
+        self.pin.input_with_pull(pinPull)
         pinValue = self.pin.value
         self.reportPin(float(pinValue))
         return pinValue
 
     # Reads an analog voltage from the specified pin
+    #
+    """
     def readVoltage(self):
         pinValue = self.pin.value / 65536
         self.reportPin(pinValue)
         return pinValue * 3.3
+    """
 
 # This is specific to pins which are attached to a servo
+# and we won't allow GPIO operations for now
+#
 class piperServoPin:
     def __init__(self, pin, name):
-        # create a PWMOut object on the control pin.
-        self.pwm = pwmio.PWMOut(pin, duty_cycle=0, frequency=50)
-        self.pin = servo.Servo(self.pwm, min_pulse=580, max_pulse=2350)
+        # create a servo object on the control pin.
+        self.pin = gpiozero.Servo(pin, min_pulse_width=0.580, max_pulse_width=2.350)
         self.name = name
 
     def setServoAngle(self, a):
         send_dv_state(self.name, "P")
-        try:
-            if a == None:
-                self.pin.fraction = None
-            else:
-                self.pin.angle = a
-        except RuntimeError as e:
-            print("Error setting servo angle", str(e))
+        self.pin.value = a / 90 - 1
 
     def setServoFraction(self, f):
         send_dv_state(self.name, "P")
-        try:
-            self.pin.fraction = f
-        except RuntimeError as e:
-            print("Error setting servo position", str(e))
+        self.pin.value = f * 2 - 1
 
 # This is specific to pins which are used for capacitive sensing sensor
+# and we won't allow GPIO operations for now
+#
 class piperCapSensePin:
     def __init__(self, pin, name):
         self.pin = TouchIn(pin)
@@ -139,30 +130,262 @@ class piperCapSensePin:
         return d
 
 # This is specific to pins which are attached to an ultrasonic distance sensor
+# and we won't allow GPIO operations for now
+#
 class piperDistanceSensorPin:
-    def __init__(self, pin, name):
-        self.pin = grove_ultrasonic_ranger.GroveUltrasonicRanger(pin)
-        self.name = name
+    """
+    Extends :class:`SmoothedInputDevice` and represents an ultrasonic distance
+    sensor.
 
-    def readDistanceSensor(self):
-        send_dv_state(self.name, "P")
+    .. note::
+
+        For improved accuracy, use the pigpio pin driver rather than the default
+        RPi.GPIO driver (pigpio uses DMA sampling for much more precise edge
+        timing). This is particularly relevant if you're using Pi 1 or Pi Zero.
+        See :ref:`changing-pin-factory` for further information.
+    """
+
+    ECHO_LOCK = Lock()
+
+    def __init__(
+            self, echo, name, queue_len=9, max_distance=3,
+            threshold_distance=0.35, partial=False, pin_factory=None):
+        super(piperDistanceSensorPin, self).__init__(
+            echo, pull_up=False, queue_len=queue_len, sample_wait=0.06,
+            partial=partial, ignore=frozenset({None}), pin_factory=pin_factory
+        )
         try:
-            d = self.pin.distance
-        except RuntimeError as e:
-            d = None
-            print("Error reading distance sensor", str(e))
-        return d
+            self.name = name
+            if max_distance <= 0:
+                raise ValueError('invalid maximum distance (must be positive)')
+            self._max_distance = max_distance
+            self.threshold = threshold_distance / max_distance
+            self.speed_of_sound = 343.26 # m/s
+            self._echo = Event()
+            self._echo_rise = None
+            self._echo_fall = None
+            self.pin.edges = 'both'
+            self.pin.bounce = None
+            self.pin.when_changed = self._echo_changed
+            self._queue.start()
+        except:
+            self.close()
+            raise
+
+        #if PiGPIOFactory is None or not isinstance(self.pin_factory, PiGPIOFactory):
+            #print(
+            #    'For more accurate readings, use the pigpio pin factory.'
+            #    'See https://gpiozero.readthedocs.io/en/stable/api_input.html#distancesensor-hc-sr04 for more info'
+            #)
+
+    def close(self):
+        super(piperDistanceSensorPin, self).close()
+
+    @property
+    def max_distance(self):
+        """
+        The maximum distance that the sensor will measure in meters. This value
+        is specified in the constructor and is used to provide the scaling for
+        the :attr:`~SmoothedInputDevice.value` attribute. When :attr:`distance`
+        is equal to :attr:`max_distance`, :attr:`~SmoothedInputDevice.value`
+        will be 1.
+        """
+        return self._max_distance
+
+    @max_distance.setter
+    def max_distance(self, value):
+        if value <= 0:
+            raise ValueError('invalid maximum distance (must be positive)')
+        t = self.threshold_distance
+        self._max_distance = value
+        self.threshold_distance = t
+
+    @property
+    def threshold_distance(self):
+        """
+        The distance, measured in meters, that will trigger the
+        :attr:`when_in_range` and :attr:`when_out_of_range` events when
+        crossed. This is simply a meter-scaled variant of the usual
+        :attr:`~SmoothedInputDevice.threshold` attribute.
+        """
+        return self.threshold * self.max_distance
+
+    @threshold_distance.setter
+    def threshold_distance(self, value):
+        self.threshold = value / self.max_distance
+
+    @property
+    def distance(self):
+        """
+        Returns the current distance measured by the sensor in meters. Note
+        that this property will have a value between 0 and
+        :attr:`max_distance`.
+        """
+        return self.value * self._max_distance
+
+    @property
+    def value(self):
+        """
+        Returns a value between 0, indicating the reflector is either touching
+        the sensor or is sufficiently near that the sensor can't tell the
+        difference, and 1, indicating the reflector is at or beyond the
+        specified *max_distance*.
+        """
+        send_dv_state(self.name, "P")
+        return super(piperDistanceSensorPin, self).value
+
+    @property
+    def echo(self):
+        """
+        Returns the :class:`Pin` that the sensor's echo is connected to. This
+        is simply an alias for the usual :attr:`~GPIODevice.pin` attribute.
+        """
+        return self.pin
+
+    def _echo_changed(self, ticks, level):
+        if level:
+            self._echo_rise = ticks
+        else:
+            self._echo_fall = ticks
+            self._echo.set()
+
+    def _read(self):
+        # Wait up to 50ms for the echo pin to fall to low (the maximum echo
+        # pulse is 35ms so this gives some leeway); if it doesn't something is
+        # horribly wrong (most likely at the hardware level)
+        if self.pin.state:
+            if not self._echo.wait(0.05):
+                print('echo pin set high')
+                return None
+        self._echo.clear()
+        self._echo_fall = None
+        self._echo_rise = None
+        # Obtain the class-level ECHO_LOCK to ensure multiple distance sensors
+        # don't listen for each other's "pings"
+        with piperDistanceSensorPin.ECHO_LOCK:
+            # Fire the trigger
+            self.pin.function = 'output'
+            self.pin.state = True
+            time.sleep(0.00001)
+            self.pin.state = False
+            time.sleep(0.00001)
+            self.pin.function = 'input'
+
+            # Wait up to 100ms for the echo pin to rise and fall (35ms is the
+            # maximum pulse time, but the pre-rise time is unspecified in the
+            # "datasheet"; 100ms seems sufficiently long to conclude something
+            # has failed)
+            if self._echo.wait(0.1):
+                if self._echo_fall is not None and self._echo_rise is not None:
+                    distance = (
+                        self.pin_factory.ticks_diff(
+                            self._echo_fall, self._echo_rise) *
+                        self.speed_of_sound / 2.0)
+                    return min(1.0, distance / self._max_distance)
+                else:
+                    # If we only saw the falling edge it means we missed
+                    # the echo because it was too fast
+                    return None
+            else:
+                # The echo pin never rose or fell; something's gone horribly
+                # wrong
+                print('no echo received')
+                return None
+
+    @property
+    def in_range(self):
+        return not self.is_active
+
+
+class piperRCtimePin(gpiozero.SmoothedInputDevice):
+    """
+    Extends :class:`SmoothedInputDevice` and represents a resistive sensor or analog voltage.
+
+    Connect a small resistor (220 or 330 ohm) to a GPIO Pin.  
+    The other leg of the resistor is now the RCtime input.
+
+    Resistive Sensor (potentiometer):
+    Connect one leg of a resistive sensor to the 3V3 pin; connect one leg of a 1µF
+    capacitor to a ground pin; connect the other leg of the resistive sensor and the other
+    leg of the capacitor to the RCtime input. 
+    
+    Analog Voltage:
+    connect one leg of a 1µF capacitor to a ground pin; connect the analog voltage source
+    and the other leg of the capacitor to the RCtime input.
+    Note, the max voltage must be 3.3V or less, and this circuit can only read down to 1.8V
+    (Range of only 3.3V - 1.8V = 1.5V unfortunately.)
+
+    This class repeatedly discharges
+    the capacitor, then times the duration it takes to charge (which will vary
+    according to the resistance or voltage.
+    """
+    def __init__(
+            self, pin, name, queue_len=5, charge_time_limit=0.01,
+            threshold=0.1, partial=False, pin_factory=None):
+        super(piperRCtimePin, self).__init__(
+            pin, pull_up=False, threshold=threshold, queue_len=queue_len,
+            sample_wait=0.0, partial=partial, pin_factory=pin_factory)
+        try:
+            self.name = name
+            self._charge_time_limit = charge_time_limit
+            self._charge_time = None
+            self._charged = Event()
+            self.pin.edges = 'rising'
+            self.pin.bounce = None
+            self.pin.when_changed = self._cap_charged
+            self._queue.start()
+        except:
+            self.close()
+            raise
+
+    @property
+    def charge_time_limit(self):
+        return self._charge_time_limit
+
+    def _cap_charged(self, ticks, state):
+        self._charge_time = ticks
+        self._charged.set()
+
+    def _read(self):
+        # Drain charge from the capacitor
+        self.pin.function = 'output'
+        self.pin.state = False
+        time.sleep(0.1)
+        self._charge_time = None
+        self._charged.clear()
+        # Time the charging of the capacitor
+        start = self.pin_factory.ticks()
+        self.pin.function = 'input'
+        self._charged.wait(self.charge_time_limit)
+        if self._charge_time is None:
+            return 0.0
+        else:
+            return 1.0 - min(1.0,
+                (self.pin_factory.ticks_diff(self._charge_time, start) /
+                self.charge_time_limit))
+
+    @property
+    def value(self):
+        """
+        Returns a value between 0 (dark) and 1 (light).
+        """
+        send_dv_state(self.name, "P")
+        return super(piperRCtimePin, self).value
+
 
 # The temperature sensor is attached to the I2C bus which can be shared
+#
 class piperTemperatureSensor:
     def __init__(self, i2c_bus):
         self.temperature_sensor = adafruit_mcp9808.MCP9808(i2c_bus)
 
     def readTemperatureSensor(self):
-        send_dv_i2c()
+        send_dv_state("GP20", "P")
+        send_dv_state("GP21", "P")
         return self.temperature_sensor.temperature
 
 # The color sensor is attached to the I2C bus which can be shared
+#
 class piperColorSensor:
     def __init__(self, i2c_bus):
         self.color_sensor = adafruit_tcs34725.TCS34725(i2c_bus)
@@ -170,7 +393,9 @@ class piperColorSensor:
         self.mult = pow((128/60), 0.6)
 
     def readColorSensor(self):
-        send_dv_i2c()
+        send_dv_state("GP20", "P")
+        send_dv_state("GP21", "P")
+
         r, g, b, clear = self.color_sensor.color_raw
         if clear == 0:
             return (0, 0, 0)
@@ -196,12 +421,15 @@ class piperColorSensor:
 
 
 # The MPU6050 IMU is attached to the I2C bus which can be shared
+#
 class piperMotionSensor:
     def __init__(self, i2c_bus, address=0x69):
         self.motion_sensor = adafruit_mpu6050.MPU6050(i2c_bus, address=address)
 
     def readMotionSensor(self):
-        send_dv_i2c()
+        send_dv_state("GP20", "P")
+        send_dv_state("GP21", "P")
+
         self.acc_x, self.acc_y, self.acc_z = self.motion_sensor.acceleration
         self.gyro_x, self.gyro_y, self.gyro_z = self.motion_sensor.gyro
         self.temp = self.motion_sensor.temperature
@@ -213,6 +441,7 @@ class piperMotionSensor:
         self.readMotionSensor()
 
 # The Heart sensor is attached to the I2C bus which can be shared
+#
 class piperHeartSensor:
     def __init__(self, i2c_bus):
         self.heart_sensor = piper_heart_sensor(i2c_bus, 4, 175)  # Use options that are generally effective
@@ -220,7 +449,9 @@ class piperHeartSensor:
         self.heart_rate = -1
 
     def readHeartSensor(self):
-        send_dv_i2c()
+        send_dv_state("GP20", "P")
+        send_dv_state("GP21", "P")
+
         self.raw_value = self.heart_sensor.read_sensor()
         if (self.heart_sensor.heart_rate == None):
             self.heart_rate = -1
@@ -231,6 +462,7 @@ class piperHeartSensor:
         self.readHeartSensor()
 
 # NeoPixels can be attached to any GPIO pin
+#
 class piperNeoPixels:
     def __init__(self, pin, name, pixel_count):
         self.pixels = neopixel.NeoPixel(pin, pixel_count, brightness=0.6, auto_write=False)
@@ -243,60 +475,36 @@ class piperNeoPixels:
     def show(self):
         send_dv_state(self.name, "P")
         self.pixels.show()
-
-
-# The Heart sensor is attached to the I2C bus which can be shared
-class piperMotors:
-    def __init__(self, i2c_bus):
-        self.motors = piper_motor_module(i2c_bus)
-
-    # set the specificed motor to coast
-    def coast(self, motor=0):
-        send_dv_i2c()
-        self.motors.coast(motor)
-
-    # set the specificed motor to brake
-    def brake(self, motor=0):
-        send_dv_i2c()
-        self.motors.brake(motor)
-
-    # stop the motors (coast)
-    def stop(self):
-        send_dv_i2c()
-        self.motors.stop()
-
-    # set the specificed motor to coast
-    def set_speed(self, motor=0, speed=0):
-        send_dv_i2c()
-        self.motors.set_speed(motor, speed)
         
 
 # constants associated with the Piper Make Controller
-BUTTON_1 = const(128)
-BUTTON_2 = const(64)
-BUTTON_3 = const(32)
-BUTTON_4 = const(16)
+BUTTON_1 = (128)
+BUTTON_2 = (64)
+BUTTON_3 = (32)
+BUTTON_4 = (16)
 
-BUTTON_5 = const(8)
-BUTTON_6 = const(4)
-BUTTON_7 = const(2)
-BUTTON_8 = const(1)
-BUTTON_9 = const(32768)
-BUTTON_10 = const(16384)
+BUTTON_5 = (8)
+BUTTON_6 = (4)
+BUTTON_7 = (2)
+BUTTON_8 = (1)
+BUTTON_9 = (32768)
+BUTTON_10 = (16384)
 
-BUTTON_11 = const(8192)
-BUTTON_12 = const(4096)
-BUTTON_13 = const(2048)
-BUTTON_14 = const(1024)
+BUTTON_11 = (8192)
+BUTTON_12 = (4096)
+BUTTON_13 = (2048)
+BUTTON_14 = (1024)
 
-ANY_BUTTON = const(64767)  # All of the bits used by the controller
+ANY_BUTTON = (64767)  # All of the bits used by the controller
 
 # This is specific to pins which are attached to the Piper Make Controller
+# and we won't allow GPIO operations for now
+#
 class piperControllerPins:
     def __init__(self, clock_pin, clock_name, data_pin, data_name, latch_pin, latch_name):
-        self.clock_pin = DigitalInOut(clock_pin)
-        self.data_pin = DigitalInOut(data_pin)
-        self.latch_pin = DigitalInOut(latch_pin)
+        self.clock_pin = gpiozero.OutputDevice(clock_pin, initial_value=True)
+        self.data_pin = gpiozero.InputDevice(data_pin, pull_up=None)
+        self.latch_pin = gpiozero.OutputDevice(latch_pin, initial_value=False)
         
         self.clock_name = clock_name
         self.data_name = data_name
@@ -305,6 +513,8 @@ class piperControllerPins:
 
         self.last = int('0' * self.bit_count, 2)
         self.pressed = self.last
+        
+        #self.gamepad = GamePadShift(self.clock_pin, self.data_pin, self.latch_pin, 16)
 
     def readButtons(self):
         send_dv_state(self.clock_name, "P")
@@ -335,43 +545,6 @@ class piperControllerPins:
         else:
             return False
 
-
-
-################################################################################
-# This function allows a user to manage joystick handling themselves.
-# See http://www.mimirgames.com/articles/games/joystick-input-and-using-deadbands/
-# for the motivation and theory
-class piperJoystickAxis:
-    def __init__(self, pin, name, outputScale=20.0, deadbandCutoff=0.1, weight=0.2):
-        self.name = name
-        self.pin = AnalogIn(pin)
-        self.outputScale = outputScale
-        self.deadbandCutoff = deadbandCutoff
-        self.weight = weight
-        self.alpha = self._Cubic(self.deadbandCutoff)
-
-    # Cubic function to map input to output in such a way as to give more precision
-    # for lower values
-    def _Cubic(self, x):
-        return self.weight * x ** 3 + (1.0 - self.weight) * x
-
-    # Eliminate the jump present in the deadband, but use the cubic function to give
-    # more precision to lower values
-    def _cubicScaledDeadband(self, x):
-        if abs(x) < self.deadbandCutoff:
-            return 0
-        else:
-            return (self._Cubic(x) - (copysign(1,x)) * self.alpha) / (1.0 - self.alpha)
-
-    # The analog joystick output is an unsigned number 0 to 2^16, which we
-    # will scale to -1 to +1 for compatibility with the cubic scaled
-    # deadband article. This will then remap and return a value
-    # still in the range -1 to +1. Finally we multiply by the requested scaler
-    # an return an integer which can be used with the mouse HID.
-    def readJoystickAxis(self):
-        pinValue = self.pin.value
-        send_dv_state(self.name, pinValue)
-        return int(self._cubicScaledDeadband((pinValue / 2 ** 15) - 1) * self.outputScale)
 
 ################################################################################
 # Blocky support functions
@@ -414,10 +587,6 @@ def send_dv_state(_pin_name, _pin_state):
         elif (piper_pin_states[_current_pin_index] != _pin_state):
             print(chr(17), _pin_name, "|", str(_pin_state), chr(16), end="")
             piper_pin_states[_current_pin_index] = _pin_state
-
-def send_dv_i2c():
-    send_dv_state("GP20", "P")
-    send_dv_state("GP21", "P")
 
 # instructs the connected computer to play a sound by sending control characters and the name
 # (or instructions related to) the specified sound
@@ -492,7 +661,11 @@ def piperGraphColor(color_value):
 
 # used to generate an RGB color value form a single integer 0-255
 def piperColorWheel(hue_value, bright_value=100):
-    bright_value = min(bright_value, 100) / 100.0
+    if (bright_value < 3):
+        return 0
+    if (bright_value >= 100):
+        return colorwheel(int(hue_value) & 255)
+    bright_value /= 100.0
     hue_value = colorwheel(int(hue_value) & 255)
     bv_a = int(((hue_value) & 255) * bright_value) & 255
     bv_b = int(((hue_value >> 8) & 255) * bright_value) & 255
