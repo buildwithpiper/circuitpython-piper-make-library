@@ -29,6 +29,7 @@ import math
 import piper_range_finder
 import piper_heart_sensor
 import piper_motor_module
+from piper_lightshow import Lightshow, PixBuffer
 import adafruit_mcp9808
 import adafruit_tcs34725
 import adafruit_mpu6050
@@ -39,6 +40,7 @@ from touchio import TouchIn
 import neopixel
 from rainbowio import colorwheel
 import time
+import random
 
 digital_view = True
 
@@ -98,6 +100,7 @@ class piperPin:
         self.reportPin(pinValue)
         return pinValue * 3.3
 
+
 # This is specific to pins which are attached to a servo
 class piperServoPin:
     def __init__(self, pin, name):
@@ -123,7 +126,8 @@ class piperServoPin:
         except RuntimeError as e:
             print("Error setting servo position", str(e))
 
-# This is specific to pins which are used for capacitive sensing sensor
+
+# This is specific to pins which are used for capacitive sensing
 class piperCapSensePin:
     def __init__(self, pin, name):
         self.pin = TouchIn(pin)
@@ -137,6 +141,7 @@ class piperCapSensePin:
             d = None
             print("Error reading capactive sense value", str(e))
         return d
+
 
 # This is specific to pins which are attached to an ultrasonic distance sensor
 class piperDistanceSensorPin:
@@ -153,6 +158,7 @@ class piperDistanceSensorPin:
             print("Error reading distance sensor", str(e))
         return d
 
+
 # The temperature sensor is attached to the I2C bus which can be shared
 class piperTemperatureSensor:
     def __init__(self, i2c_bus):
@@ -161,6 +167,7 @@ class piperTemperatureSensor:
     def readTemperatureSensor(self):
         send_dv_i2c()
         return self.temperature_sensor.temperature
+
 
 # The color sensor is attached to the I2C bus which can be shared
 class piperColorSensor:
@@ -189,10 +196,6 @@ class piperColorSensor:
 
     def read(self):
         return self.readColorSensor()
-        
-    def sensorGain(self, val):
-        self.mult = pow((128/val), 0.6)
-        self.color_sensor.gain = val
 
 
 # The MPU6050 IMU is attached to the I2C bus which can be shared
@@ -212,10 +215,11 @@ class piperMotionSensor:
     def read(self):
         self.readMotionSensor()
 
+
 # The Heart sensor is attached to the I2C bus which can be shared
 class piperHeartSensor:
     def __init__(self, i2c_bus):
-        self.heart_sensor = piper_heart_sensor(i2c_bus, 4, 175)  # Use options that are generally effective
+        self.heart_sensor = piper_heart_sensor(i2c_bus, smoothing=4, channel=0)  # Use options that are generally effective
         self.raw_value = 0
         self.heart_rate = -1
 
@@ -245,31 +249,81 @@ class piperNeoPixels:
         self.pixels.show()
 
 
-# The Heart sensor is attached to the I2C bus which can be shared
-class piperMotors:
+# The Lightshow module is connected to SPI0 (17, 18, 19), and the pins are hardcoded
+# because they are driven continuously by the second processor on the RP2040
+class piperLightshow:
+    def __init__(self):
+        self.lightshow = Lightshow()
+        self.pix = PixBuffer()
+
+    def from_text(self, string, color=63, bgcolor=0, colors=None):
+        return self.pix.from_text(string, color, bgcolor, colors)
+
+    def from_grid(self, lines):
+        return self.pix.from_grid(lines)
+
+    def pixel(self, x, y, color=None):
+        __pixel = self.pix.pixel(x, y, color)
+        if __pixel is not None:
+            return __pixel
+
+    def box(self, color, x=0, y=0, width=None, height=None):
+        self.pix.box(color, x, y, width, height)
+
+    def clear(self):
+        self.pix.box(0, 0, 0, 8, 8)
+
+    def draw(self, source, dx=0, dy=0, x=0, y=0, width=None, height=None, key=None):
+        self.pix.draw(source, dx, dy, x, y, width, height, key)
+
+    def send_dv_lightshow(self, pixel_array):
+        global digital_view
+        if (digital_view == True):
+            __base_str = 'ABDEFHIJKMNOQSTUVWXYZ{}[]=+:0123456789abcdefghijklmnopqrstuvwxyz'
+            print(chr(17), 'L', ''.join([__base_str[__i] for __i in list(pixel_array)]), chr(17))
+        
+    def show(self):
+        self.lightshow.show(self.pix)
+        self.send_dv_lightshow(self.pix.buffer)
+
+    def format_color(self, color):
+        return self.lightshow.rgb_to_byte(color)
+
+# The Motor Module is attached to the I2C bus which can be shared
+class piperMotorModule:
     def __init__(self, i2c_bus):
-        self.motors = piper_motor_module(i2c_bus)
+        self.motor_module = piper_motor_module(i2c_bus)
 
     # set the specificed motor to coast
     def coast(self, motor=0):
         send_dv_i2c()
-        self.motors.coast(motor)
+        self.motor_module.coast(motor)
 
     # set the specificed motor to brake
     def brake(self, motor=0):
         send_dv_i2c()
-        self.motors.brake(motor)
+        self.motor_module.brake(motor)
 
     # stop the motors (coast)
     def stop(self):
         send_dv_i2c()
-        self.motors.stop()
+        self.motor_module.stop()
 
     # set the specificed motor to coast
     def set_speed(self, motor=0, speed=0):
         send_dv_i2c()
-        self.motors.set_speed(motor, speed)
-        
+        self.motor_module.set_speed(motor, speed)
+
+    # set the angle of the servo
+    def servo_angle(self, servo=0, angle=0):
+        send_dv_i2c()
+        self.motor_module.servo_angle(servo, angle)
+
+    # detach the servo
+    def servo_stop(self, servo=0):
+        send_dv_i2c()
+        self.motor_module.servo_stop(servo)
+
 
 # constants associated with the Piper Make Controller
 BUTTON_1 = const(128)
@@ -289,7 +343,11 @@ BUTTON_12 = const(4096)
 BUTTON_13 = const(2048)
 BUTTON_14 = const(1024)
 
-ANY_BUTTON = const(64767)  # All of the bits used by the controller
+BUTTON_15 = const(512)
+BUTTON_16 = const(256)
+
+ANY_BUTTON = const(64767)  # All of the bits used by the 14 button controller
+ANY_BUTTON_16 = const(65535)  # All of the bits used by the 16 button controller
 
 # This is specific to pins which are attached to the Piper Make Controller
 class piperControllerPins:
@@ -336,11 +394,8 @@ class piperControllerPins:
             return False
 
 
-
-################################################################################
 # This function allows a user to manage joystick handling themselves.
-# See http://www.mimirgames.com/articles/games/joystick-input-and-using-deadbands/
-# for the motivation and theory
+# From http://www.mimirgames.com/articles/games/joystick-input-and-using-deadbands/
 class piperJoystickAxis:
     def __init__(self, pin, name, outputScale=20.0, deadbandCutoff=0.1, weight=0.2):
         self.name = name
@@ -372,6 +427,7 @@ class piperJoystickAxis:
         pinValue = self.pin.value
         send_dv_state(self.name, pinValue)
         return int(self._cubicScaledDeadband((pinValue / 2 ** 15) - 1) * self.outputScale)
+
 
 ################################################################################
 # Blocky support functions
@@ -462,7 +518,7 @@ def colorCompare(a, b):
 # compares two numbers (int or float) and outputs a value from 0 (very different) to 100 (the same).
 def numberCompare(a, b):
     try:
-        c = int((1 - abs(a-b)/(abs(a) + abs(b))) * 100)
+        c = 100 - int(min(math.pow(abs(a - b), 0.75), 100))
     except:
         return 0
     return c
@@ -482,6 +538,26 @@ def stringCompare(a, b):
 def mapValue(value, a, b, c, d):
     return c + ((float(value - a) / float(b - a)) * (d - c))
 
+# find the index of a value in a list that is closest to the given value
+def find_closest_in_list(target, lst, conf_thd, comp_func, find_value): 
+    _best_index = -1 
+    _best_score = 1e20 if comp_func == numberCompare else 0 
+    for i, value in enumerate(lst):
+        _score = find_in_list_compare(target, value, comp_func) 
+        if (_score >= conf_thd and comp_func != numberCompare) or (_score < _best_score and comp_func == numberCompare): 
+            _best_index = i 
+            _best_score = _score
+    if _best_index == -1 and find_value: 
+        return None 
+    elif find_value: 
+        return lst[_best_index] 
+    else: 
+        return _best_index + 1
+
+# used for comapring numerical values in a list
+def find_in_list_compare(target, value, comp_func): 
+    return comp_func(target, value) if comp_func != numberCompare else abs(target - value)
+
 # helper function for graphing number values
 def piperGraphNumbers(graph_values):
     print(chr(17), 'G', ','.join(graph_values), chr(17), end='')
@@ -493,8 +569,14 @@ def piperGraphColor(color_value):
 # used to generate an RGB color value form a single integer 0-255
 def piperColorWheel(hue_value, bright_value=100):
     bright_value = min(bright_value, 100) / 100.0
-    hue_value = colorwheel(int(hue_value) & 255)
-    bv_a = int(((hue_value) & 255) * bright_value) & 255
-    bv_b = int(((hue_value >> 8) & 255) * bright_value) & 255
-    bv_c = int(((hue_value >> 16) & 255) * bright_value) & 255
-    return (bv_a, bv_b, bv_c)
+    _hue_value = colorwheel(int(_hue_value) & 255)
+    _bv_r = int(((_hue_value) & 255) * bright_value) & 255
+    _bv_g = int(((_hue_value >> 8) & 255) * bright_value) & 255
+    _bv_b = int(((_hue_value >> 16) & 255) * bright_value) & 255
+    return (_bv_r, _bv_g, _bv_b)
+
+def randomColor(bright_value):
+    if bright_value is None:
+        return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+    else:
+        return piperColorWheel(random.randint(0, 255), bright_value)
