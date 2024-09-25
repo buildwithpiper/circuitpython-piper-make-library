@@ -146,7 +146,7 @@ class piperCapSensePin:
 # This is specific to pins which are attached to an ultrasonic distance sensor
 class piperDistanceSensorPin:
     def __init__(self, pin, name):
-        self.pin = grove_ultrasonic_ranger.GroveUltrasonicRanger(pin)
+        self.pin = piper_range_finder.PiperUltrasonicRanger(pin)
         self.name = name
 
     def readDistanceSensor(self):
