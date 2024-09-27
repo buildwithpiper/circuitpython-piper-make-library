@@ -62,6 +62,7 @@ class piperPin:
         elif type == 'Voltage':
             self.pin = pwmio.PWMOut(pin, frequency=5000, duty_cycle=0)
         self.name = name
+        self.type = type
 
     # Report the pin's state for use by the digital view
     def reportPin(self, pinStr):
@@ -75,7 +76,7 @@ class piperPin:
 
     # Sets the pin to be an output at the specified logic level
     def setPin(self, pinState):
-        if (self.pin.type == 'Voltage'):
+        if (self.type == 'Voltage'):
             # Set the pin state by setting a PWM duty cycle.
             pinValue = max(min(float(pinState), 3.3), 0) / 3.3
             self.pin.duty_cycle = int(65535 * pinValue)
