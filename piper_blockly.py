@@ -220,7 +220,8 @@ class piperMotionSensor:
 # The Heart sensor is attached to the I2C bus which can be shared
 class piperHeartSensor:
     def __init__(self, i2c_bus):
-        self.heart_sensor = piper_heart_sensor(i2c_bus, smoothing=4, channel=0)  # Use options that are generally effective
+        # Use options that are generally effective, use green LED channel
+        self.heart_sensor = piper_heart_sensor.PiperHeartSensor(i2c_bus, smoothing=4, channel=0)
         self.raw_value = 0
         self.heart_rate = -1
 
