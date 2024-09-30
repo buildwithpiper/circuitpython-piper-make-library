@@ -577,7 +577,7 @@ def piperColorWheel(hue_value, bright_value=100):
     _bv_b = int(((_hue_value >> 16) & 255) * bright_value) & 255
     return (_bv_r, _bv_g, _bv_b)
 
-def randomColor(bright_value):
+def randomColor(bright_value=None):
     if bright_value is None:
         return (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
     else:
