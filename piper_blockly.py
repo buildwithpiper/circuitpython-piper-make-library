@@ -589,10 +589,10 @@ def piperGraphColor(color_value):
 # used to generate an RGB color value form a single integer 0-255
 def piperColorWheel(hue_value, bright_value=100):
     bright_value = min(bright_value, 100) / 100.0
-    _hue_value = colorwheel(int(_hue_value) & 255)
-    _bv_r = int(((_hue_value) & 255) * bright_value) & 255
-    _bv_g = int(((_hue_value >> 8) & 255) * bright_value) & 255
-    _bv_b = int(((_hue_value >> 16) & 255) * bright_value) & 255
+    hue_value = colorwheel(int(hue_value) & 255)
+    _bv_r = int(((hue_value) & 255) * bright_value) & 255
+    _bv_g = int(((hue_value >> 8) & 255) * bright_value) & 255
+    _bv_b = int(((hue_value >> 16) & 255) * bright_value) & 255
     return (_bv_r, _bv_g, _bv_b)
 
 def randomColor(bright_value=None):
