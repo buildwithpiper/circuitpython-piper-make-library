@@ -368,6 +368,7 @@ class piperControllerPins:
 
         self.last = 0
         self.pressed = 0
+        self.released = 0
 
     def readButtons(self):
         send_dv_state(self.clock_name, "P")
