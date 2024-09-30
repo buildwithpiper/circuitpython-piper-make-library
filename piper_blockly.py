@@ -365,10 +365,9 @@ class piperControllerPins:
         self.clock_name = clock_name
         self.data_name = data_name
         self.latch_name = latch_name
-        # self.bit_count = 16
 
-        self.last = 0    #int('0' * self.bit_count, 2)
-        self.pressed = self.last
+        self.last = 0
+        self.pressed = 0
 
     def readButtons(self):
         send_dv_state(self.clock_name, "P")
@@ -376,24 +375,39 @@ class piperControllerPins:
         send_dv_state(self.latch_name, "P")
 
         try:
-            current = 0  #int('0' * self.bit_count, 2)
-            bit = 1      #int('0' * (self.bit_count - 1) + '1', 2)
+            current = 0
+            bit = 1
             self.latch_pin.value = True
-            for i in range(16):   #range(self.bit_count):
+            for i in range(16):
                 self.clock_pin.value = False
                 if self.data_pin.value:
                     current |= bit
                 self.clock_pin.value = True
                 bit <<= 1
             self.latch_pin.value = False
-            self.pressed |= (self.last & current)
+            self.pressed |= ((~self.last) & current)
+            self.released |= (self.last & (~current))
             self.last = current
         except RuntimeError as e:
             print("Error reading controller buttons", str(e))
-        return self.pressed
+        return self.last
+
+    def isPressed(self, b):
+        if (self.last & b):
+            return True
+        else:
+            return False
 
     def wasPressed(self, b):
         if (self.pressed & b):
+            self.pressed &= (~b)
+            return True
+        else:
+            return False
+
+    def wasReleased(self, b):
+        if (self.released & b):
+            self.released &= (~b)
             return True
         else:
             return False
