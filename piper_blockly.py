@@ -294,7 +294,7 @@ class piperLightshow:
 # The Motor Module is attached to the I2C bus which can be shared
 class piperMotorModule:
     def __init__(self, i2c_bus):
-        self.motor_module = piper_motor_module.piperMotorModule(i2c_bus)
+        self.motor_module = piper_motor_module.PiperMotorModule(i2c_bus)
 
     # set the specificed motor to coast
     def coast(self, motor=0):
