@@ -357,13 +357,17 @@ class piperControllerPins:
         self.clock_pin = DigitalInOut(clock_pin)
         self.data_pin = DigitalInOut(data_pin)
         self.latch_pin = DigitalInOut(latch_pin)
+
+        self.clock_pin.direction = Direction.OUTPUT
+        self.data_pin.direction = Direction.INPUT
+        self.latch_pin.direction = Direction.OUTPUT
         
         self.clock_name = clock_name
         self.data_name = data_name
         self.latch_name = latch_name
-        self.bit_count = 16
+        # self.bit_count = 16
 
-        self.last = int('0' * self.bit_count, 2)
+        self.last = 0    #int('0' * self.bit_count, 2)
         self.pressed = self.last
 
     def readButtons(self):
@@ -372,11 +376,10 @@ class piperControllerPins:
         send_dv_state(self.latch_name, "P")
 
         try:
-            current = int('0' * self.bit_count, 2)
-            bit = int('0' * (self.bit_count - 1) + '1', 2)
-
+            current = 0  #int('0' * self.bit_count, 2)
+            bit = 1      #int('0' * (self.bit_count - 1) + '1', 2)
             self.latch_pin.value = True
-            for i in range(self.bit_count):
+            for i in range(16):   #range(self.bit_count):
                 self.clock_pin.value = False
                 if self.data_pin.value:
                     current |= bit
