@@ -69,8 +69,9 @@ class piperPin:
         global digital_view
         if (digital_view == True):
             if not pinStr:
-                self.pin.direction = Direction.INPUT
-                self.pin.pull = Pull.UP
+                if self.type == 'Digital':
+                    self.pin.direction = Direction.INPUT
+                    self.pin.pull = Pull.UP
                 pinStr = float(self.pin.value)
             send_dv_state(self.name, pinStr)
 
