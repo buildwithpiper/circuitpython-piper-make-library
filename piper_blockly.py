@@ -64,43 +64,32 @@ class piperPin:
         self.name = name
         self.type = type
 
-    # Report the pin's state for use by the digital view
-    def reportPin(self, pinStr):
-        global digital_view
-        if (digital_view == True):
-            if not pinStr:
-                if self.type == 'Digital':
-                    self.pin.direction = Direction.INPUT
-                    self.pin.pull = Pull.UP
-                pinStr = float(self.pin.value)
-            send_dv_state(self.name, pinStr)
-
     # Sets the pin to be an output at the specified logic level
-    def setPin(self, pinState):
+    def setPin(self, pin_state):
         if (self.type == 'Voltage'):
             # Set the pin state by setting a PWM duty cycle.
-            pinValue = max(min(float(pinState), 3.3), 0) / 3.3
-            self.pin.duty_cycle = int(65535 * pinValue)
-            self.reportPin(pinValue)
+            pin_value = max(min(float(pin_state), 3.3), 0) / 3.3
+            self.pin.duty_cycle = int(65535 * pin_value)
+            send_dv_state(self.name, pin_value)
         else:
             self.pin.direction = Direction.OUTPUT
-            self.pin.value = pinState
-            self.reportPin(pinState)
+            self.pin.value = pin_state
+            send_dv_state(self.name, pin_state)
 
     # Reads the pin by setting it to an input and setting it's pull-up/down and then returning its value
     # (Note that this means you can't use it to detect the state of output pins)
-    def checkPin(self, pinPull):
+    def checkPin(self, pin_pull):
         self.pin.direction = Direction.INPUT
-        self.pin.pull = pinPull
-        pinValue = self.pin.value
-        self.reportPin(float(pinValue))
-        return pinValue
+        self.pin.pull = pin_pull
+        pin_value = self.pin.value
+        send_dv_state(self.name, pin_value)
+        return pin_value
 
     # Reads an analog voltage from the specified pin
     def readVoltage(self):
-        pinValue = self.pin.value / 65536
-        self.reportPin(pinValue)
-        return pinValue * 3.3
+        pin_value = self.pin.value / 65536
+        send_dv_state(self.name, pin_value)
+        return pin_value * 3.3
 
 
 # This is specific to pins which are attached to a servo
@@ -445,9 +434,9 @@ class piperJoystickAxis:
     # still in the range -1 to +1. Finally we multiply by the requested scaler
     # an return an integer which can be used with the mouse HID.
     def readJoystickAxis(self):
-        pinValue = self.pin.value
-        send_dv_state(self.name, pinValue)
-        return int(self._cubicScaledDeadband((pinValue / 2 ** 15) - 1) * self.outputScale)
+        pin_value = self.pin.value
+        send_dv_state(self.name, pin_value / 65535)
+        return int(self._cubicScaledDeadband((pin_value / 2 ** 15) - 1) * self.outputScale)
 
 
 ################################################################################
