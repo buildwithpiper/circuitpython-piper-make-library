@@ -74,7 +74,7 @@ class piperPin:
         else:
             self.pin.direction = Direction.OUTPUT
             self.pin.value = pin_state
-            send_dv_state(self.name, pin_state)
+            send_dv_state(self.name, int(pin_state))
 
     # Reads the pin by setting it to an input and setting it's pull-up/down and then returning its value
     # (Note that this means you can't use it to detect the state of output pins)
@@ -82,7 +82,7 @@ class piperPin:
         self.pin.direction = Direction.INPUT
         self.pin.pull = pin_pull
         pin_value = self.pin.value
-        send_dv_state(self.name, pin_value)
+        send_dv_state(self.name, int(pin_value))
         return pin_value
 
     # Reads an analog voltage from the specified pin
@@ -125,9 +125,9 @@ class piperCapSensePin:
         self.name = name
 
     def readCapSenseValue(self):
-        send_dv_state(self.name, "P")
         try:
             d = self.pin.raw_value
+            send_dv_state(self.name, float(max(min(d / 10000, 10000), 0))
         except RuntimeError as e:
             d = None
             print("Error reading capactive sense value", str(e))
