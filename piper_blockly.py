@@ -127,7 +127,7 @@ class piperCapSensePin:
     def readCapSenseValue(self):
         try:
             d = self.pin.raw_value
-            send_dv_state(self.name, float(max(min(d / 10000, 10000), 0))
+            send_dv_state(self.name, float(max(min(d / 10000, 10000), 0)))
         except RuntimeError as e:
             d = None
             print("Error reading capactive sense value", str(e))
