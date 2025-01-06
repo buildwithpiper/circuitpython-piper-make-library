@@ -29,7 +29,10 @@ import math
 import piper_range_finder
 import piper_heart_sensor
 import piper_motor_module
-from piper_lightshow import Lightshow, PixBuffer
+try:
+    from piper_lightshow import Lightshow, PixBuffer
+except:
+    pass
 import adafruit_mcp9808
 import adafruit_tcs34725
 import adafruit_mpu6050
