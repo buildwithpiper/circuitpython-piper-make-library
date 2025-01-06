@@ -27,7 +27,10 @@ from digitalio import DigitalInOut, Direction, Pull
 from analogio import AnalogIn
 import math
 import piper_range_finder
-import piper_heart_sensor
+try:
+    import piper_heart_sensor
+except:
+    pass
 import piper_motor_module
 try:
     from piper_lightshow import Lightshow, PixBuffer
