@@ -31,9 +31,16 @@ try:
     import piper_heart_sensor
 except:
     pass
-import piper_motor_module
+try:
+    import piper_motor_module
+except:
+    pass
 try:
     from piper_lightshow import Lightshow, PixBuffer
+except:
+    pass
+try:
+    import piper_radio_module
 except:
     pass
 import adafruit_mcp9808
@@ -61,6 +68,8 @@ def set_digital_view(state):
 # This class is for digital GPIO pins
 class piperPin:
     def __init__(self, pin, name, type='Digital'):
+        if (not name):
+            name = str(pin)[6:10]
         if type == 'Digital':
             self.pin = DigitalInOut(pin)
         elif type == 'Analog':
@@ -136,7 +145,7 @@ class piperCapSensePin:
             send_dv_state(self.name, float(max(min(d / 10000, 10000), 0)))
         except RuntimeError as e:
             d = None
-            print("Error reading capactive sense value", str(e))
+            print("Error reading capacitive sense value", str(e))
         return d
 
 
@@ -292,12 +301,12 @@ class piperMotorModule:
     def __init__(self, i2c_bus):
         self.motor_module = piper_motor_module.PiperMotorModule(i2c_bus)
 
-    # set the specificed motor to coast
+    # set the specified motor to coast
     def coast(self, motor=0):
         send_dv_i2c()
         self.motor_module.coast(motor)
 
-    # set the specificed motor to brake
+    # set the specified motor to brake
     def brake(self, motor=0):
         send_dv_i2c()
         self.motor_module.brake(motor)
@@ -307,7 +316,7 @@ class piperMotorModule:
         send_dv_i2c()
         self.motor_module.stop()
 
-    # set the specificed motor to coast
+    # set the specified motor to coast
     def set_speed(self, motor=0, speed=0):
         send_dv_i2c()
         self.motor_module.set_speed(motor, speed)
@@ -321,6 +330,81 @@ class piperMotorModule:
     def servo_stop(self, servo=0):
         send_dv_i2c()
         self.motor_module.servo_stop(servo)
+
+
+# The Radio Module is attached to the I2C bus which can be shared
+RADIO_COLOR_SENSOR = 0
+RADIO_TEMP_SENSOR = 1
+RADIO_MOTION_SENSOR = 2
+RADIO_HEART_SENSOR = 3
+RADIO_MOTOR_MODULE = 4
+
+RADIO_GPIO_INPUT = 0
+RADIO_GPIO_INPUT_PULLUP = 4
+RADIO_GPIO_INPUT_PULLDOWN = 8
+RADIO_GPIO_INPUT_ANALOG = 2
+RADIO_GPIO_INPUT_TOUCH = 16
+RADIO_GPIO_INPUT_RANGE = 32
+RADIO_GPIO_OUTPUT_DIGITAL = 1
+RADIO_GPIO_OUTPUT_ANALOG = 3
+RADIO_GPIO_OUTPUT_SERVO = 33
+
+RADIO_ALLOW_GPIO = 0xFE00
+RADIO_ALLOW_MOTOR = 0x2
+RADIO_ALLOW_LED = 0x1
+RADIO_ALLOW_ALL = 0xFE03
+
+class piperRadioModule:
+    def __init__(self, i2c_bus):
+        self.radio_module = piper_radio_module.piper_radio_module(i2c_bus)
+
+    def read_sensor(self, peer, module_type=1, value_index=0):
+        send_dv_i2c()
+        return self.radio_module.read_sensor(peer, module_type, value_index)
+    
+    def setup_gpio(self, peer, gpio_pin, pin_type):
+        send_dv_i2c()
+        self.radio_module.setup_gpio(peer, gpio_pin, pin_type)
+    
+    def read_gpio(self, peer, gpio_pin):
+        send_dv_i2c()
+        return self.radio_module.read_gpio(peer, gpio_pin)
+
+    def write_gpio(self, peer, gpio_pin, value):
+        send_dv_i2c()
+        self.radio_module.write_gpio(peer, gpio_pin, value)
+
+    def write_motor_module(self, peer, gpio_pin, value):
+        send_dv_i2c()
+        self.radio_module.write_motor_module(peer, gpio_pin, value)
+
+    def get_address(self):
+        send_dv_i2c()
+        return self.radio_module.get_address()
+    
+    def set_peer_address(self, peer, address):
+        send_dv_i2c()
+        self.radio_module.set_peer_address(peer, address)
+
+    def send_message(self, peer, message):
+        send_dv_i2c()
+        self.radio_module.send_message(peer, message)
+
+    def get_message(self):
+        send_dv_i2c()
+        return self.radio_module.get_message()
+
+    def get_firmware_version(self):
+        send_dv_i2c()
+        return self.radio_module.get_firmware_version()
+    
+    def get_send_success(self):
+        send_dv_i2c()
+        return self.radio_module.get_send_success()
+
+    def channel_analysis(self):
+        send_dv_i2c()
+        return self.radio_module.channel_analysis()
 
 
 # constants associated with the Piper Make Controller
@@ -570,9 +654,34 @@ def find_closest_in_list(target, lst, conf_thd, comp_func, find_value):
     else: 
         return _best_index + 1
 
-# used for comapring numerical values in a list
+# used for comparing numerical values in a list
 def find_in_list_compare(target, value, comp_func): 
     return comp_func(target, value) if comp_func != numberCompare else abs(target - value)
+
+# requests pose data from connected computer's webcam
+def webcam_read_poses():
+    print(chr(17) + 'M |R' + chr(17), end='')
+
+# retrieves requested pose data from connected computer's webcam
+def webcam_get_pose(_val, _att):
+    return int(input(chr(17) + 'M |W,' + _val + ',' + _att + chr(17)))
+
+# retrieves color data from connected computer's webcam
+def webcam_get_color():
+    hex_str = input(chr(17) + 'M |E' + chr(17))
+    return (int(hex_str[0:2], 16), int(hex_str[2:4], 16), int(hex_str[4:6], 16))
+
+# requests interpreted speech data from connected computer's microphone
+def mic_read_commands():
+    print(chr(17) + 'M |C' + chr(17), end='')
+
+# retrieves requested interpreted speech data from connected computer's microphone
+def mic_get_command(_conf):
+    return input(chr(17) + 'M |S,' + str(_conf) + chr(17))
+
+# retrieves JSON data (flattened) from a specified URL
+def fetch_url_data(_url):
+    return input(chr(17) + 'M |U,' + str(_url) + chr(17)).split(',')
 
 # helper function for graphing number values
 def piperGraphNumbers(graph_values):
