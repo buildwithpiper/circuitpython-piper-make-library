@@ -111,6 +111,8 @@ class piperPin:
 class piperServoPin:
     def __init__(self, pin, name):
         # create a PWMOut object on the control pin.
+        if (not name):
+            name = str(pin)[6:10]
         self.pwm = pwmio.PWMOut(pin, duty_cycle=0, frequency=50)
         self.pin = servo.Servo(self.pwm, min_pulse=580, max_pulse=2350)
         self.name = name
@@ -136,6 +138,8 @@ class piperServoPin:
 # This is specific to pins which are used for capacitive sensing
 class piperCapSensePin:
     def __init__(self, pin, name):
+        if (not name):
+            name = str(pin)[6:10]
         self.pin = TouchIn(pin)
         self.name = name
 
@@ -152,6 +156,8 @@ class piperCapSensePin:
 # This is specific to pins which are attached to an ultrasonic distance sensor
 class piperDistanceSensorPin:
     def __init__(self, pin, name):
+        if (not name):
+            name = str(pin)[6:10]
         self.pin = piper_range_finder.PiperUltrasonicRanger(pin)
         self.name = name
 
@@ -244,6 +250,8 @@ class piperHeartSensor:
 # NeoPixels can be attached to any GPIO pin
 class piperNeoPixels:
     def __init__(self, pin, name, pixel_count):
+        if (not name):
+            name = str(pin)[6:10]
         self.pixels = neopixel.NeoPixel(pin, pixel_count, brightness=0.6, auto_write=False)
         self.pin = pin
         self.name = name
@@ -441,7 +449,13 @@ class piperControllerPins:
         self.clock_pin.direction = Direction.OUTPUT
         self.data_pin.direction = Direction.INPUT
         self.latch_pin.direction = Direction.OUTPUT
-        
+
+        if (not clock_name):
+            clock_name = str(clock_pin)[6:10]
+        if (not data_name):
+            data_name = str(data_pin)[6:10]
+        if (not latch_name):
+            latch_name = str(latch_pin)[6:10]
         self.clock_name = clock_name
         self.data_name = data_name
         self.latch_name = latch_name
@@ -498,6 +512,8 @@ class piperControllerPins:
 # From http://www.mimirgames.com/articles/games/joystick-input-and-using-deadbands/
 class piperJoystickAxis:
     def __init__(self, pin, name, outputScale=20.0, deadbandCutoff=0.1, weight=0.2):
+        if (not name):
+            name = str(pin)[6:10]
         self.name = name
         self.pin = AnalogIn(pin)
         self.outputScale = outputScale
