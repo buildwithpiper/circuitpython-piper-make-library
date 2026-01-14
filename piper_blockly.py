@@ -386,6 +386,10 @@ class piperRadioModule:
         send_dv_i2c()
         self.radio_module.write_motor_module(peer, gpio_pin, value)
 
+    def set_led_color(self, peer, color):
+        send_dv_i2c()
+        self.radio_module.set_led_color(peer, color)
+        
     def allow_peer(self, mask, allow):
         send_dv_i2c()
         self.radio_module.allow_peer(mask, allow)
