@@ -386,6 +386,10 @@ class piperRadioModule:
         send_dv_i2c()
         self.radio_module.write_motor_module(peer, gpio_pin, value)
 
+    def allow_peer(self, mask, allow):
+        send_dv_i2c()
+        self.radio_module.allow_peer(mask, allow)
+        
     def get_address(self):
         send_dv_i2c()
         return self.radio_module.get_address()
