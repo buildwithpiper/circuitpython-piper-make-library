@@ -67,7 +67,7 @@ def set_digital_view(state):
 ################################################################################
 # This class is for digital GPIO pins
 class piperPin:
-    def __init__(self, pin, name, type='Digital'):
+    def __init__(self, pin, name=None, type='Digital'):
         if (not name):
             name = str(pin)[6:10]
         if type == 'Digital':
@@ -109,7 +109,7 @@ class piperPin:
 
 # This is specific to pins which are attached to a servo
 class piperServoPin:
-    def __init__(self, pin, name):
+    def __init__(self, pin, name=None):
         # create a PWMOut object on the control pin.
         if (not name):
             name = str(pin)[6:10]
@@ -137,7 +137,7 @@ class piperServoPin:
 
 # This is specific to pins which are used for capacitive sensing
 class piperCapSensePin:
-    def __init__(self, pin, name):
+    def __init__(self, pin, name=None):
         if (not name):
             name = str(pin)[6:10]
         self.pin = TouchIn(pin)
@@ -155,7 +155,7 @@ class piperCapSensePin:
 
 # This is specific to pins which are attached to an ultrasonic distance sensor
 class piperDistanceSensorPin:
-    def __init__(self, pin, name):
+    def __init__(self, pin, name=None):
         if (not name):
             name = str(pin)[6:10]
         self.pin = piper_range_finder.PiperUltrasonicRanger(pin)
@@ -249,7 +249,7 @@ class piperHeartSensor:
 
 # NeoPixels can be attached to any GPIO pin
 class piperNeoPixels:
-    def __init__(self, pin, name, pixel_count):
+    def __init__(self, pin, name=None, pixel_count=10):
         if (not name):
             name = str(pin)[6:10]
         self.pixels = neopixel.NeoPixel(pin, pixel_count, brightness=0.6, auto_write=False)
@@ -449,7 +449,8 @@ ANY_BUTTON_16 = const(65535)  # All of the bits used by the 16 button controller
 
 # This is specific to pins which are attached to the Piper Make Controller
 class piperControllerPins:
-    def __init__(self, clock_pin, clock_name, data_pin, data_name, latch_pin, latch_name):
+    #def __init__(self, clock_pin, clock_name, data_pin, data_name, latch_pin, latch_name):  # older version - this is a change to the API!!!
+    def __init__(self, clock_pin, data_pin, latch_pin, clock_name, data_name, latch_name):
         self.clock_pin = DigitalInOut(clock_pin)
         self.data_pin = DigitalInOut(data_pin)
         self.latch_pin = DigitalInOut(latch_pin)
