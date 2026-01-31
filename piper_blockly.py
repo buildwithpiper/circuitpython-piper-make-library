@@ -450,7 +450,7 @@ ANY_BUTTON_16 = const(65535)  # All of the bits used by the 16 button controller
 # This is specific to pins which are attached to the Piper Make Controller
 class piperControllerPins:
     #def __init__(self, clock_pin, clock_name, data_pin, data_name, latch_pin, latch_name):  # older version - this is a change to the API!!!
-    def __init__(self, clock_pin, data_pin, latch_pin, clock_name, data_name, latch_name):
+    def __init__(self, clock_pin, data_pin, latch_pin, clock_name=None, data_name=None, latch_name=None):
         self.clock_pin = DigitalInOut(clock_pin)
         self.data_pin = DigitalInOut(data_pin)
         self.latch_pin = DigitalInOut(latch_pin)
@@ -520,7 +520,7 @@ class piperControllerPins:
 # This function allows a user to manage joystick handling themselves.
 # From http://www.mimirgames.com/articles/games/joystick-input-and-using-deadbands/
 class piperJoystickAxis:
-    def __init__(self, pin, name, outputScale=20.0, deadbandCutoff=0.1, weight=0.2):
+    def __init__(self, pin, name=None, outputScale=20.0, deadbandCutoff=0.1, weight=0.2):
         if (not name):
             name = str(pin)[6:10]
         self.name = name
